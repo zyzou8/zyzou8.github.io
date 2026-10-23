@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AI 100 Debugging Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --navy: #1E407C; --ink: #1B2233; --paper: #FFFFFF; --mist: #EEF1F6;
+    --line: #CBD3E1; --amber: #9A6200; --amber-bg: #FFF4DB;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; font-family: "Atkinson Hyperlegible", system-ui, sans-serif; color: var(--ink); background: var(--mist); line-height: 1.5; }
+  header { background: var(--navy); color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
+  header h1 { font-size: 1.15rem; margin: 0; }
+  #bridge { font-size: .85rem; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.15); }
+  main { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; padding: 20px 24px; max-width: 1300px; margin: 0 auto; }
+  @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
+  section { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; }
+  h2 { font-size: 1.05rem; margin: 0 0 10px; color: var(--navy); }
+  label { font-weight: 700; display: block; margin: 14px 0 6px; font-size: .95rem; }
+  select, textarea { width: 100%; font: inherit; border: 1px solid var(--line); border-radius: 4px; padding: 8px 10px; background: #fff; color: var(--ink); }
+  textarea.code { font-family: "JetBrains Mono", monospace; font-size: .85rem; min-height: 230px; background: #F7F8FB; }
+  .assignment { background: var(--mist); padding: 10px 12px; border-radius: 4px; font-size: .95rem; max-width: 75ch; }
+  .ladder { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .ladder button { flex: 1; border: 0; border-right: 1px solid var(--line); background: #fff; padding: 9px 6px; font: inherit; font-size: .88rem; cursor: pointer; color: var(--ink); }
+  .ladder button:last-child { border-right: 0; }
+  .ladder button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+  .ladder button:disabled { color: #9aa3b5; cursor: not-allowed; }
+  .actions { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .primary { background: var(--navy); color: #fff; border: 0; padding: 10px 18px; border-radius: 4px; font: inherit; font-weight: 700; cursor: pointer; }
+  .secondary { background: #fff; color: var(--navy); border: 1px solid var(--navy); padding: 10px 18px; border-radius: 4px; font: inherit; cursor: pointer; }
+  button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #F2B300; outline-offset: 2px; }
+  #log, #qa-log { display: flex; flex-direction: column; gap: 12px; min-height: 300px; max-height: 60vh; overflow-y: auto; }
+  .msg { padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; font-size: .93rem; max-width: 75ch; }
+  .msg.student { background: var(--mist); align-self: flex-end; }
+  .msg.tutor { background: var(--amber-bg); border-left: 4px solid var(--amber); }
+  .msg.system { color: #5b6478; font-size: .85rem; }
+  .empty { color: #5b6478; }
+  .rating { display: flex; gap: 6px; flex-wrap: wrap; }
+  .rating button { width: 42px; height: 38px; border: 1px solid var(--line); background: #fff; border-radius: 4px; font: inherit; cursor: pointer; }
+  .rating button[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
+  .hint { font-size: .85rem; color: #5b6478; margin: 4px 0 0; }
+  .full { grid-column: 1 / -1; }
+  .qa-grid { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; }
+  @media (max-width: 860px) { .qa-grid { grid-template-columns: 1fr; } }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chips button { border: 1px solid var(--line); background: var(--mist); color: var(--ink); border-radius: 999px; padding: 6px 12px; font: inherit; font-size: .85rem; cursor: pointer; }
+  .chips button:hover { border-color: var(--navy); }
+  .kind { display: flex; gap: 0; border: 1px solid var(--line); border-radius: 4px; overflow: hidden; }
+  .kind button { flex: 1; border: 0; border-right: 1px solid var(--line); background: #fff; padding: 9px 6px; font: inherit; font-size: .88rem; cursor: pointer; color: var(--ink); }
+  .kind button:last-child { border-right: 0; }
+  .kind button[aria-pressed="true"] { background: var(--navy); color: #fff; }
+  #qa-log { min-height: 220px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>AI 100 Debugging Lab</h1>
+  <span id="bridge">Checking tutor connection…</span>
+</header>
+
+<main>
+  <section aria-labelledby="task-h">
+    <h2 id="task-h">Your task</h2>
+    <label for="task">Task</label>
+    <select id="task"></select>
+    <div class="assignment" id="assignment"></div>
+
+    <label for="code">Your code</label>
+    <textarea id="code" class="code" spellcheck="false"></textarea>
+
+    <label>How much help do you want?</label>
+    <div class="ladder" id="ladder" role="group" aria-label="Hint level">
+      <button data-level="1" aria-pressed="true">1. Think it through</button>
+      <button data-level="2" aria-pressed="false" disabled>2. Trace it step by step</button>
+      <button data-level="3" aria-pressed="false" disabled>3. See a similar example</button>
+    </div>
+    <p class="hint">Higher levels unlock after you've asked at the level before.</p>
+
+    <p class="hint" style="margin-top:14px">Before you ask, think first. Short answers are fine, and a wrong guess still helps.</p>
+
+    <label for="expect">1. What should the code print?</label>
+    <textarea id="expect" rows="1" placeholder="Work it out by hand first"></textarea>
+
+    <label for="got">2. What does it actually print?</label>
+    <textarea id="got" rows="1" placeholder="Run it, or read the task description"></textarea>
+
+    <label for="guess">3. What's your best guess about why?</label>
+    <textarea id="guess" rows="2" placeholder="e.g. I think the problem is in the line that…"></textarea>
+
+    <label for="q">4. What do you want to ask the tutor?</label>
+    <textarea id="q" rows="2" placeholder="e.g. Is my guess on the right track?"></textarea>
+
+    <div class="actions">
+      <button class="primary" id="ask">Ask the tutor</button>
+      <button class="secondary" id="copy" hidden>Copy for AI Studio</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="chat-h">
+    <h2 id="chat-h">AI tutor</h2>
+    <div id="log" aria-live="polite"><p class="empty">Ask a question and the tutor's reply shows up here.</p></div>
+
+    <label>How hard was this task?</label>
+    <div class="rating" id="rating" role="group" aria-label="Difficulty from 1 easy to 5 very hard">
+      <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button>
+    </div>
+    <p class="hint">1 is easy, 5 is very hard.</p>
+  </section>
+
+  <section class="full" aria-labelledby="qa-h">
+    <h2 id="qa-h">Ask your own question</h2>
+    <p class="hint">Anything about Python or programming: a word you don't understand, an error message, or your own code. The tutor explains in plain language and helps you think it through.</p>
+    <div class="qa-grid">
+      <div>
+        <label>What kind of question is it?</label>
+        <div class="kind" id="qa-kind" role="group" aria-label="Question type">
+          <button data-kind="concept" aria-pressed="true">Explain an idea</button>
+          <button data-kind="error" aria-pressed="false">An error message</button>
+          <button data-kind="code" aria-pressed="false">My own code</button>
+        </div>
+
+        <label>Not sure what to ask? Try one:</label>
+        <div class="chips" id="qa-chips">
+          <button data-kind="concept">What is a variable?</button>
+          <button data-kind="concept">What does a for loop do?</button>
+          <button data-kind="concept">What's the difference between = and ==?</button>
+          <button data-kind="error">What does "NameError" mean?</button>
+          <button data-kind="concept">Why does range(1, 4) stop at 3?</button>
+        </div>
+
+        <label for="qa-q">Your question</label>
+        <textarea id="qa-q" rows="3" placeholder="e.g. What does len() do?"></textarea>
+
+        <label for="qa-code">Code or error message (optional)</label>
+        <textarea id="qa-code" class="code" rows="5" style="min-height:110px" spellcheck="false" placeholder="Paste your code or the exact error message here"></textarea>
+
+        <label for="qa-think">What do you think so far? (optional)</label>
+        <textarea id="qa-think" rows="2" placeholder="e.g. I think it's like a box that stores a number?"></textarea>
+
+        <div class="actions">
+          <button class="primary" id="qa-ask">Ask</button>
+          <button class="secondary" id="qa-clear">Clear conversation</button>
+        </div>
+      </div>
+      <div>
+        <label>Answers</label>
+        <div id="qa-log" class="log" aria-live="polite"><p class="empty">Your questions and the tutor's answers show up here.</p></div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+// ---- 示例 task（正式版从每门课的配置文件读取） ----
+// 每个 task 只有一个 bug，用日常场景，非 CS 专业的学生也能看懂
+const TASKS = [
+  {
+    id: "ai100_quiz_avg",
+    title: "Task 1: Average of three quiz scores",
+    assignment: "You took three quizzes and scored 80, 90 and 85. The code should print your average score, which is 85.0. But it prints the wrong number. Find the bug and fix it.",
+    code: `# Your three quiz scores
+quiz1 = 80
+quiz2 = 90
+quiz3 = 85
+
+# Add them up, then divide to get the average
+average = (quiz1 + quiz2 + quiz3) / 2
+
+print("Your average is", average)
+# Expected: Your average is 85.0`
+  },
+  {
+    id: "ai100_pass_check",
+    title: "Task 2: Did I pass?",
+    assignment: "A student passes if their score is 60 or higher. This student scored exactly 60, so the code should print \"Pass\". But it prints \"Fail\". Find the bug and fix it.",
+    code: `score = 60
+
+# You pass with 60 or more points
+if score > 60:
+    print("Pass")
+else:
+    print("Fail")
+
+# Expected: Pass`
+  },
+  {
+    id: "ai100_grocery_total",
+    title: "Task 3: Grocery bill",
+    assignment: "You bought milk ($3), bread ($2) and apples ($5). The code should add up every price and print a total of 10. But the total comes out too low. Find the bug and fix it.",
+    code: `prices = [3, 2, 5]   # milk, bread, apples
+total = 0
+
+# Go through the prices one at a time and add each one to the total
+for i in range(1, len(prices)):
+    total = total + prices[i]
+
+print("Total:", total)
+# Expected: Total: 10`
+  }
+];
+
+// 每次提问都会带上的总规则：让学生自己思考，一步一步来
+const TUTOR_RULES = `You are a patient programming tutor for a student who is NOT a computer science major and is new to Python.
+Your goal is to help the student THINK and find the bug themselves, not to fix it for them.
+Rules:
+- Use plain, everyday language. If you must use a programming word, explain it in a few words.
+- Keep your reply short: at most about 6 sentences.
+- Cover one small step at a time. Don't jump ahead to the answer.
+- Start by reacting to the student's own guess: say what is good about it, or ask what made them think that.
+- NEVER give the corrected code, the corrected line, or say exactly what to change.
+- End with exactly ONE question for the student to think about and answer.
+- If the student has clearly found the bug, don't just confirm it. Ask them to explain in their own words why it caused the wrong output, and how they would check that their fix works.`;
+
+const HINT_RULES = {
+  1: `Hint level 1 (Think it through):
+Help me understand what the code is supposed to do before looking for the bug.
+- Ask me to describe in my own words what the program should do, step by step, like a recipe.
+- Ask me to work out the correct answer by hand (for example with pen and paper), and compare it with what the code printed.
+- Do NOT point to any specific line of code yet.`,
+  2: `Hint level 2 (Trace it step by step):
+Guide me to "trace" the code: follow it line by line and write down the value of each variable as it changes.
+- Show me how to start a small table with the first one or two steps, then leave the remaining steps blank for me to fill in.
+- Ask me to find the first step where the real value is different from what I expected.
+- You may tell me which part of the code (for example "the calculation" or "the loop") is worth tracing, but don't say what is wrong with it.`,
+  3: `Hint level 3 (See a similar example):
+Show me how you would find a similar bug in a DIFFERENT, simple everyday example (not my code).
+- Use this structure: "Here is a similar problem: ___. First I figured out what the answer should be: ___. Then I followed the code step by step: ___. I spotted the problem when ___. Finally I checked my fix by ___."
+- Then ask me to use the same steps on my own code.
+- Do NOT give the fix for my code.`
+};
+
+// 自由提问区：按问题类型给 tutor 不同的指导方式
+const QA_RULES = {
+  concept: `The student wants to understand an idea.
+- Explain it in 2-4 short sentences with an everyday comparison (cooking, shopping, school, etc.).
+- Show ONE tiny Python example (3 lines or fewer) and say in words what it prints.
+- Then ask ONE short question that checks they understood, e.g. "What do you think this prints if we change ___?"`,
+  error: `The student is asking about an error message.
+- Explain what the error means in plain words, and the most common reasons it happens.
+- Show them how to read the error: which line it points to and which word matters.
+- Do NOT fix their code. Ask ONE question that helps them find the cause themselves.`,
+  code: `The student is asking about their own code.
+- First ask (or restate) what the code is supposed to do, and what happens instead.
+- Guide them to trace it step by step, one small step at a time.
+- NEVER give the corrected code or say exactly what to change. End with ONE question.`
+};
+
+const $ = (id) => document.getElementById(id);
+// 普通 http:// 页面（非 https、非 localhost）没有 crypto.randomUUID 和剪贴板 API，这里做兜底
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t);
+  t.select(); document.execCommand("copy"); t.remove();
+}
+let level = 1, maxUnlocked = 1, difficulty = null;
+const events = []; // 研究日志：正式版发到你的后端
+
+// ---- task 选择 ----
+TASKS.forEach((t, i) => $("task").add(new Option(t.title, i)));
+function loadTask() {
+  const t = TASKS[$("task").value];
+  $("assignment").textContent = t.assignment;
+  $("code").value = t.code;
+  ["expect", "got", "guess", "q"].forEach((id) => ($(id).value = ""));
+  level = 1; maxUnlocked = 1; renderLadder();
+}
+$("task").addEventListener("change", loadTask);
+loadTask();
+
+// ---- hint 阶梯 ----
+function renderLadder() {
+  document.querySelectorAll("#ladder button").forEach((b) => {
+    const l = +b.dataset.level;
+    b.disabled = l > maxUnlocked;
+    b.setAttribute("aria-pressed", l === level);
+  });
+}
+$("ladder").addEventListener("click", (e) => {
+  const b = e.target.closest("button");
+  if (!b || b.disabled) return;
+  level = +b.dataset.level; renderLadder();
+});
+
+// ---- 组装发给 AI Studio agent 的 prompt ----
+function buildPrompt() {
+  const t = TASKS[$("task").value];
+  const val = (id) => $(id).value.trim() || "(I didn't write anything yet)";
+  return `[TASK ${t.id}] [HINT_LEVEL ${level}]
+${TUTOR_RULES}
+
+${HINT_RULES[level]}
+
+Assignment:
+${t.assignment}
+
+My current code:
+\`\`\`python
+${$("code").value}
+\`\`\`
+
+My thinking so far:
+- What I expect it to print: ${val("expect")}
+- What it actually prints: ${val("got")}
+- My guess about why: ${val("guess")}
+- My question: ${val("q")}`;
+}
+
+function addMsg(cls, text, logId = "log") {
+  const log = $(logId);
+  const empty = log.querySelector(".empty");
+  if (empty) empty.remove();
+  const d = document.createElement("div");
+  d.className = "msg " + cls; d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+// 同一时间只能问一个问题（AI Studio 标签页一次只处理一条）
+function setBusy(b) { $("ask").disabled = b; $("qa-ask").disabled = b; }
+
+// ---- 和插件通信 ----
+const hasBridge = () => document.documentElement.dataset.tutorBridge === "ready";
+setTimeout(() => {
+  if (hasBridge()) {
+    $("bridge").textContent = "Tutor connected";
+  } else {
+    $("bridge").textContent = "Tutor extension not found";
+    $("copy").hidden = false;
+  }
+}, 300);
+
+const pending = new Map();
+window.addEventListener("message", (e) => {
+  if (e.source !== window || !e.data || e.data.source !== "tutor-extension") return;
+  if (e.data.type !== "AI_RESULT") return;
+  const p = pending.get(e.data.requestId);
+  if (!p) return;
+  pending.delete(e.data.requestId);
+  p.bubble.remove();
+  if (e.data.error) {
+    addMsg("system", e.data.error, p.log);
+  } else if (p.log === "qa-log") {
+    addMsg("tutor", e.data.text, "qa-log");
+    events.push({ t: Date.now(), type: "qa_reply", kind: p.kind, text: e.data.text });
+  } else {
+    addMsg("tutor", e.data.text);
+    events.push({ t: Date.now(), type: "tutor_reply", level, text: e.data.text });
+    if (level === maxUnlocked && maxUnlocked < 3) { maxUnlocked++; renderLadder(); }
+  }
+  setBusy(false);
+});
+
+$("ask").addEventListener("click", () => {
+  if (!hasBridge()) { addMsg("system", "Install the AI 100 Tutor extension, or use Copy for AI Studio."); return; }
+  if (!$("guess").value.trim()) {
+    addMsg("system", "Tip: write your best guess in box 3 first. Even a wrong guess helps the tutor help you think.");
+  }
+  const text = buildPrompt();
+  const requestId = newId();
+  const guess = $("guess").value.trim();
+  addMsg("student", `(Level ${level}) ${$("q").value.trim() || "Help me with this code."}${guess ? `\nMy guess: ${guess}` : ""}`);
+  pending.set(requestId, { log: "log", bubble: addMsg("system", "Waiting for the tutor…") });
+  events.push({ t: Date.now(), type: "ask", task: TASKS[$("task").value].id, level,
+    expect: $("expect").value.trim(), got: $("got").value.trim(), guess, question: $("q").value.trim() });
+  setBusy(true);
+  window.postMessage({ source: "tutor-page", type: "ASK", requestId, text }, window.location.origin);
+});
+
+// ---- 没装插件时的兜底：复制粘贴 ----
+$("copy").addEventListener("click", async () => {
+  await copyText(buildPrompt());
+  addMsg("system", "Copied. Paste it into the AI 100 Tutor agent in AI Studio.");
+});
+
+// ---- 自由提问区 ----
+let qaKind = "concept";
+function setKind(k) {
+  qaKind = k;
+  document.querySelectorAll("#qa-kind button").forEach((b) => b.setAttribute("aria-pressed", b.dataset.kind === k));
+}
+$("qa-kind").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (b) setKind(b.dataset.kind);
+});
+$("qa-chips").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  setKind(b.dataset.kind);
+  $("qa-q").value = b.textContent;
+  $("qa-q").focus();
+});
+
+function buildQaPrompt() {
+  const code = $("qa-code").value.trim();
+  const think = $("qa-think").value.trim();
+  return `[FREE_QUESTION] [TYPE ${qaKind}]
+${TUTOR_RULES}
+
+${QA_RULES[qaKind]}
+
+My question:
+${$("qa-q").value.trim()}
+${code ? `\nMy code or error message:\n\`\`\`\n${code}\n\`\`\`\n` : ""}
+What I think so far: ${think || "(I didn't write anything yet)"}`;
+}
+
+$("qa-ask").addEventListener("click", async () => {
+  const q = $("qa-q").value.trim();
+  if (!q) { $("qa-q").focus(); addMsg("system", "Type your question first.", "qa-log"); return; }
+  if (!hasBridge()) {
+    await copyText(buildQaPrompt());
+    addMsg("system", "Tutor extension not found. Your question was copied: paste it into the AI 100 Tutor agent in AI Studio.", "qa-log");
+    return;
+  }
+  const text = buildQaPrompt();
+  const requestId = newId();
+  const think = $("qa-think").value.trim();
+  addMsg("student", q + ($("qa-code").value.trim() ? "\n(+ code attached)" : "") + (think ? `\nI think: ${think}` : ""), "qa-log");
+  pending.set(requestId, { log: "qa-log", kind: qaKind, bubble: addMsg("system", "Waiting for the tutor…", "qa-log") });
+  events.push({ t: Date.now(), type: "qa_ask", kind: qaKind, question: q, think, hasCode: !!$("qa-code").value.trim() });
+  setBusy(true);
+  window.postMessage({ source: "tutor-page", type: "ASK", requestId, text }, window.location.origin);
+  ["qa-q", "qa-think"].forEach((id) => ($(id).value = ""));
+});
+
+$("qa-clear").addEventListener("click", () => {
+  $("qa-log").innerHTML = '<p class="empty">Your questions and the tutor\'s answers show up here.</p>';
+  ["qa-q", "qa-code", "qa-think"].forEach((id) => ($(id).value = ""));
+});
+
+// ---- 难度报告 ----
+$("rating").addEventListener("click", (e) => {
+  const b = e.target.closest("button"); if (!b) return;
+  difficulty = +b.textContent;
+  document.querySelectorAll("#rating button").forEach((x) => x.setAttribute("aria-pressed", x === b));
+  events.push({ t: Date.now(), type: "difficulty", task: TASKS[$("task").value].id, value: difficulty });
+});
+</script>
+</body>
+</html>
