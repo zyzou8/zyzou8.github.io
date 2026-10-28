@@ -15,7 +15,7 @@
   body { margin: 0; font-family: "Atkinson Hyperlegible", system-ui, sans-serif; color: var(--ink); background: var(--mist); line-height: 1.5; }
   header { background: var(--navy); color: #fff; padding: 14px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; }
   header h1 { font-size: 1.15rem; margin: 0; }
-  .pill { font-size: .85rem; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.15); }
+  #bridge { font-size: .85rem; padding: 4px 10px; border-radius: 999px; background: rgba(255,255,255,.15); }
   main { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr); gap: 20px; padding: 20px 24px; max-width: 1300px; margin: 0 auto; }
   @media (max-width: 860px) { main { grid-template-columns: 1fr; } }
   section { background: var(--paper); border: 1px solid var(--line); border-radius: 6px; padding: 18px 20px; }
@@ -33,6 +33,12 @@
   .primary { background: var(--navy); color: #fff; border: 0; padding: 10px 18px; border-radius: 4px; font: inherit; font-weight: 700; cursor: pointer; }
   .secondary { background: #fff; color: var(--navy); border: 1px solid var(--navy); padding: 10px 18px; border-radius: 4px; font: inherit; cursor: pointer; }
   button:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #F2B300; outline-offset: 2px; }
+  #log, #qa-log { display: flex; flex-direction: column; gap: 12px; min-height: 300px; max-height: 60vh; overflow-y: auto; }
+  .msg { padding: 10px 12px; border-radius: 6px; white-space: pre-wrap; font-size: .93rem; max-width: 75ch; }
+  .msg.student { background: var(--mist); align-self: flex-end; }
+  .msg.tutor { background: var(--amber-bg); border-left: 4px solid var(--amber); }
+  .msg.system { color: #5b6478; font-size: .85rem; }
+  .empty { color: #5b6478; }
   .rating { display: flex; gap: 6px; flex-wrap: wrap; }
   .rating button { width: 42px; height: 38px; border: 1px solid var(--line); background: #fff; border-radius: 4px; font: inherit; cursor: pointer; }
   .rating button[aria-pressed="true"] { background: var(--navy); color: #fff; border-color: var(--navy); }
@@ -47,124 +53,117 @@
   .kind button { flex: 1; border: 0; border-right: 1px solid var(--line); background: #fff; padding: 9px 6px; font: inherit; font-size: .88rem; cursor: pointer; color: var(--ink); }
   .kind button:last-child { border-right: 0; }
   .kind button[aria-pressed="true"] { background: var(--navy); color: #fff; }
-  .stack { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
-  .open-ai { width: 100%; font-size: 1rem; padding: 12px 18px; margin-top: 12px; }
-  a { color: var(--navy); }
-  .steps { margin: 0; padding-left: 1.3em; font-size: .93rem; }
-  .steps li { margin: 2px 0; }
-  kbd { font-family: "JetBrains Mono", monospace; font-size: .8rem; border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 3px; padding: 0 4px; background: #fff; }
-  #toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 6px; font-size: .95rem; max-width: min(92vw, 520px); box-shadow: 0 6px 24px rgba(0,0,0,.2); opacity: 0; pointer-events: none; transition: opacity .2s; z-index: 10; }
-  #toast.show { opacity: 1; }
+  #qa-log { min-height: 220px; }
+  .install { max-width: 1300px; margin: 16px auto 0; padding: 12px 16px; background: var(--amber-bg); border: 1px solid #E8C77A; border-radius: 6px; font-size: .95rem; width: calc(100% - 48px); }
+  .install a { color: var(--navy); }
 </style>
 </head>
 <body>
 <header>
   <h1>AI 100 Debugging Lab</h1>
-  <span class="pill">Uses your own Penn State AI Studio login</span>
+  <span id="bridge">Checking tutor connection…</span>
 </header>
 
+<div id="install" class="install" hidden>
+  <b>One-time setup:</b> to get answers on this page, add the AI 100 Tutor extension to Chrome or Edge
+  (<a id="install-link" target="_blank" rel="noopener">install it here</a>), sign in to
+  <a href="https://aistudio.psu.edu/chat/onechat" target="_blank" rel="noopener">Penn State AI Studio</a>, then reload this page.
+</div>
+
 <main>
-  <div class="stack">
-    <section aria-labelledby="task-h">
-      <h2 id="task-h">Your task</h2>
-      <label for="task">Task</label>
-      <select id="task"></select>
-      <div class="assignment" id="assignment"></div>
+  <section aria-labelledby="task-h">
+    <h2 id="task-h">Your task</h2>
+    <label for="task">Task</label>
+    <select id="task"></select>
+    <div class="assignment" id="assignment"></div>
 
-      <label for="code">Your code</label>
-      <textarea id="code" class="code" spellcheck="false"></textarea>
+    <label for="code">Your code</label>
+    <textarea id="code" class="code" spellcheck="false"></textarea>
 
-      <label>How much help do you want?</label>
-      <div class="ladder" id="ladder" role="group" aria-label="Hint level">
-        <button data-level="1" aria-pressed="true">1. Think it through</button>
-        <button data-level="2" aria-pressed="false" disabled>2. Trace it step by step</button>
-        <button data-level="3" aria-pressed="false" disabled>3. See a similar example</button>
+    <label>How much help do you want?</label>
+    <div class="ladder" id="ladder" role="group" aria-label="Hint level">
+      <button data-level="1" aria-pressed="true">1. Think it through</button>
+      <button data-level="2" aria-pressed="false" disabled>2. Trace it step by step</button>
+      <button data-level="3" aria-pressed="false" disabled>3. See a similar example</button>
+    </div>
+    <p class="hint">Higher levels unlock after you've asked at the level before.</p>
+
+    <p class="hint" style="margin-top:14px">Before you ask, think first. Short answers are fine, and a wrong guess still helps.</p>
+
+    <label for="expect">1. What should the code print?</label>
+    <textarea id="expect" rows="1" placeholder="Work it out by hand first"></textarea>
+
+    <label for="got">2. What does it actually print?</label>
+    <textarea id="got" rows="1" placeholder="Run it, or read the task description"></textarea>
+
+    <label for="guess">3. What's your best guess about why?</label>
+    <textarea id="guess" rows="2" placeholder="e.g. I think the problem is in the line that…"></textarea>
+
+    <label for="q">4. What do you want to ask the tutor?</label>
+    <textarea id="q" rows="2" placeholder="e.g. Is my guess on the right track?"></textarea>
+
+    <div class="actions">
+      <button class="primary" id="ask">Ask the tutor</button>
+      <button class="secondary" id="copy" hidden>Copy for AI Studio</button>
+    </div>
+  </section>
+
+  <section aria-labelledby="chat-h">
+    <h2 id="chat-h">AI tutor</h2>
+    <div id="log" aria-live="polite"><p class="empty">Ask a question and the tutor's reply shows up here.</p></div>
+
+    <label>How hard was this task?</label>
+    <div class="rating" id="rating" role="group" aria-label="Difficulty from 1 easy to 5 very hard">
+      <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button>
+    </div>
+    <p class="hint">1 is easy, 5 is very hard.</p>
+  </section>
+
+  <section class="full" aria-labelledby="qa-h">
+    <h2 id="qa-h">Ask your own question</h2>
+    <p class="hint">Anything about Python or programming: a word you don't understand, an error message, or your own code. The tutor explains in plain language and helps you think it through.</p>
+    <div class="qa-grid">
+      <div>
+        <label>What kind of question is it?</label>
+        <div class="kind" id="qa-kind" role="group" aria-label="Question type">
+          <button data-kind="concept" aria-pressed="true">Explain an idea</button>
+          <button data-kind="error" aria-pressed="false">An error message</button>
+          <button data-kind="code" aria-pressed="false">My own code</button>
+        </div>
+
+        <label>Not sure what to ask? Try one:</label>
+        <div class="chips" id="qa-chips">
+          <button data-kind="concept">What is a variable?</button>
+          <button data-kind="concept">What does a for loop do?</button>
+          <button data-kind="concept">What's the difference between = and ==?</button>
+          <button data-kind="error">What does "NameError" mean?</button>
+          <button data-kind="concept">Why does range(1, 4) stop at 3?</button>
+        </div>
+
+        <label for="qa-q">Your question</label>
+        <textarea id="qa-q" rows="3" placeholder="e.g. What does len() do?"></textarea>
+
+        <label for="qa-code">Code or error message (optional)</label>
+        <textarea id="qa-code" class="code" rows="5" style="min-height:110px" spellcheck="false" placeholder="Paste your code or the exact error message here"></textarea>
+
+        <label for="qa-think">What do you think so far? (optional)</label>
+        <textarea id="qa-think" rows="2" placeholder="e.g. I think it's like a box that stores a number?"></textarea>
+
+        <div class="actions">
+          <button class="primary" id="qa-ask">Ask</button>
+          <button class="secondary" id="qa-clear">Clear conversation</button>
+        </div>
       </div>
-      <p class="hint">Higher levels unlock after you've asked at the level before.</p>
-
-      <p class="hint" style="margin-top:14px">Before you ask, think first. Short answers are fine, and a wrong guess still helps.</p>
-
-      <label for="expect">1. What should the code print?</label>
-      <textarea id="expect" rows="1" placeholder="Work it out by hand first"></textarea>
-
-      <label for="got">2. What does it actually print?</label>
-      <textarea id="got" rows="1" placeholder="Run it, or read the task description"></textarea>
-
-      <label for="guess">3. What's your best guess about why?</label>
-      <textarea id="guess" rows="2" placeholder="e.g. I think the problem is in the line that…"></textarea>
-
-      <label for="q">4. What do you want to ask the tutor?</label>
-      <textarea id="q" rows="2" placeholder="e.g. Is my guess on the right track?"></textarea>
-
-      <div class="actions">
-        <button class="primary" id="ask">Copy question &amp; go to AI Studio</button>
+      <div>
+        <label>Answers</label>
+        <div id="qa-log" class="log" aria-live="polite"><p class="empty">Your questions and the tutor's answers show up here.</p></div>
       </div>
-
-      <label>How hard was this task?</label>
-      <div class="rating" id="rating" role="group" aria-label="Difficulty from 1 easy to 5 very hard">
-        <button>1</button><button>2</button><button>3</button><button>4</button><button>5</button>
-      </div>
-      <p class="hint">1 is easy, 5 is very hard.</p>
-    </section>
-
-  </div>
-
-  <div class="stack">
-    <section aria-labelledby="how-h">
-      <h2 id="how-h">How it works</h2>
-      <ol class="steps">
-        <li>Click <b>Open AI Studio</b> below and sign in with your Penn State account. Keep that window open next to this page.</li>
-        <li>Pick a task, think first, and fill in the boxes.</li>
-        <li>Click <b>Copy question &amp; go to AI Studio</b>.</li>
-        <li>Go to the AI Studio window, click its message box, paste (<kbd>⌘</kbd>+<kbd>V</kbd> on Mac, <kbd>Ctrl</kbd>+<kbd>V</kbd> on Windows) and press <kbd>Enter</kbd>.</li>
-      </ol>
-      <button class="primary open-ai" id="open-ai">Open AI Studio ↗</button>
-      <p class="hint">Opens in its own window beside this page. If nothing opens, allow pop-ups for this site, or go to <a id="ai-link" target="_blank" rel="noopener">aistudio.psu.edu</a>.</p>
-    </section>
-
-    <section aria-labelledby="qa-h">
-      <h2 id="qa-h">Ask your own question</h2>
-      <p class="hint">Anything about Python or programming: a word you don't understand, an error message, or your own code.</p>
-
-      <label>What kind of question is it?</label>
-      <div class="kind" id="qa-kind" role="group" aria-label="Question type">
-        <button data-kind="concept" aria-pressed="true">Explain an idea</button>
-        <button data-kind="error" aria-pressed="false">An error message</button>
-        <button data-kind="code" aria-pressed="false">My own code</button>
-      </div>
-
-      <label>Not sure what to ask? Try one:</label>
-      <div class="chips" id="qa-chips">
-        <button data-kind="concept">What is a variable?</button>
-        <button data-kind="concept">What does a for loop do?</button>
-        <button data-kind="concept">What's the difference between = and ==?</button>
-        <button data-kind="error">What does "NameError" mean?</button>
-        <button data-kind="concept">Why does range(1, 4) stop at 3?</button>
-      </div>
-
-      <label for="qa-q">Your question</label>
-      <textarea id="qa-q" rows="3" placeholder="e.g. What does len() do?"></textarea>
-
-      <label for="qa-code">Code or error message (optional)</label>
-      <textarea id="qa-code" class="code" rows="5" style="min-height:110px" spellcheck="false" placeholder="Paste your code or the exact error message here"></textarea>
-
-      <label for="qa-think">What do you think so far? (optional)</label>
-      <textarea id="qa-think" rows="2" placeholder="e.g. I think it's like a box that stores a number?"></textarea>
-
-      <div class="actions">
-        <button class="primary" id="qa-ask">Copy question &amp; go to AI Studio</button>
-      </div>
-    </section>
-  </div>
-
+    </div>
+  </section>
 </main>
 
-<div id="toast" role="status" aria-live="polite"></div>
-
 <script>
-// AI Studio 地址：学生在自己的浏览器里用自己的 PSU 账号登录，本页面不接触任何账号信息
-const AI_STUDIO_URL = "https://aistudio.psu.edu/chat/onechat";
-
+// ---- 示例 task（正式版从每门课的配置文件读取） ----
 // 每个 task 只有一个 bug，用日常场景，非 CS 专业的学生也能看懂
 const TASKS = [
   {
@@ -259,36 +258,15 @@ const QA_RULES = {
 };
 
 const $ = (id) => document.getElementById(id);
+// 普通 http:// 页面（非 https、非 localhost）没有 crypto.randomUUID 和剪贴板 API，这里做兜底
+const newId = () => (crypto.randomUUID ? crypto.randomUUID() : Date.now().toString(36) + Math.random().toString(36).slice(2));
+async function copyText(text) {
+  if (navigator.clipboard && window.isSecureContext) return navigator.clipboard.writeText(text);
+  const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t);
+  t.select(); document.execCommand("copy"); t.remove();
+}
 let level = 1, maxUnlocked = 1, difficulty = null;
 const events = []; // 研究日志：正式版发到你的后端
-
-$("ai-link").href = AI_STUDIO_URL;
-
-// 在页面旁边打开 AI Studio 窗口；已经打开过就切过去，不重新加载（保留对话）
-let aiWin = null;
-function openAiStudio() {
-  if (aiWin && !aiWin.closed) { aiWin.focus(); return true; }
-  const w = Math.round(screen.availWidth / 2), h = screen.availHeight;
-  aiWin = window.open(AI_STUDIO_URL, "psu-ai-studio", `popup,width=${w},height=${h},left=${screen.availWidth - w},top=0`);
-  return !!aiWin;
-}
-$("open-ai").addEventListener("click", openAiStudio);
-
-async function copyText(text) {
-  try {
-    await navigator.clipboard.writeText(text);
-  } catch {
-    const t = document.createElement("textarea"); t.value = text; document.body.appendChild(t);
-    t.select(); document.execCommand("copy"); t.remove();
-  }
-}
-
-let toastTimer;
-function toast(msg) {
-  $("toast").textContent = msg; $("toast").classList.add("show");
-  clearTimeout(toastTimer); toastTimer = setTimeout(() => $("toast").classList.remove("show"), 6000);
-}
-const PASTE_TIP = "Copied! Go to the AI Studio window, click its message box, paste (⌘V or Ctrl+V) and press Enter.";
 
 // ---- task 选择 ----
 TASKS.forEach((t, i) => $("task").add(new Option(t.title, i)));
@@ -316,7 +294,7 @@ $("ladder").addEventListener("click", (e) => {
   level = +b.dataset.level; renderLadder();
 });
 
-// ---- 组装发给 AI Studio 的问题 ----
+// ---- 组装发给 AI Studio agent 的 prompt ----
 function buildPrompt() {
   const t = TASKS[$("task").value];
   const val = (id) => $(id).value.trim() || "(I didn't write anything yet)";
@@ -340,15 +318,76 @@ My thinking so far:
 - My question: ${val("q")}`;
 }
 
-$("ask").addEventListener("click", async () => {
-  await copyText(buildPrompt());
+function addMsg(cls, text, logId = "log") {
+  const log = $(logId);
+  const empty = log.querySelector(".empty");
+  if (empty) empty.remove();
+  const d = document.createElement("div");
+  d.className = "msg " + cls; d.textContent = text;
+  log.appendChild(d); log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+// 同一时间只能问一个问题（AI Studio 标签页一次只处理一条）
+function setBusy(b) { $("ask").disabled = b; $("qa-ask").disabled = b; }
+
+// ---- 和插件通信 ----
+// Chrome Web Store 上架后，把插件链接填在这里，页面会显示"安装"按钮
+const EXTENSION_INSTALL_URL = "";
+const hasBridge = () => document.documentElement.dataset.tutorBridge === "ready";
+setTimeout(() => {
+  if (hasBridge()) {
+    $("bridge").textContent = "Tutor connected";
+  } else {
+    $("bridge").textContent = "Tutor extension not found";
+    $("copy").hidden = false;
+    $("install").hidden = false;
+    if (EXTENSION_INSTALL_URL) $("install-link").href = EXTENSION_INSTALL_URL;
+    else $("install-link").replaceWith("ask your instructor for the install link");
+  }
+}, 300);
+
+const pending = new Map();
+window.addEventListener("message", (e) => {
+  if (e.source !== window || !e.data || e.data.source !== "tutor-extension") return;
+  if (e.data.type !== "AI_RESULT") return;
+  const p = pending.get(e.data.requestId);
+  if (!p) return;
+  pending.delete(e.data.requestId);
+  p.bubble.remove();
+  if (e.data.error) {
+    addMsg("system", e.data.error, p.log);
+  } else if (p.log === "qa-log") {
+    addMsg("tutor", e.data.text, "qa-log");
+    events.push({ t: Date.now(), type: "qa_reply", kind: p.kind, text: e.data.text });
+  } else {
+    addMsg("tutor", e.data.text);
+    events.push({ t: Date.now(), type: "tutor_reply", level, text: e.data.text });
+    if (level === maxUnlocked && maxUnlocked < 3) { maxUnlocked++; renderLadder(); }
+  }
+  setBusy(false);
+});
+
+$("ask").addEventListener("click", () => {
+  if (!hasBridge()) { addMsg("system", "Install the AI 100 Tutor extension, or use Copy for AI Studio."); return; }
+  if (!$("guess").value.trim()) {
+    addMsg("system", "Tip: write your best guess in box 3 first. Even a wrong guess helps the tutor help you think.");
+  }
+  const text = buildPrompt();
+  const requestId = newId();
   const guess = $("guess").value.trim();
-  toast(guess ? PASTE_TIP : PASTE_TIP + " (Tip: next time, write your best guess in box 3 first.)");
-  openAiStudio();
+  addMsg("student", `(Level ${level}) ${$("q").value.trim() || "Help me with this code."}${guess ? `\nMy guess: ${guess}` : ""}`);
+  pending.set(requestId, { log: "log", bubble: addMsg("system", "Waiting for the tutor…") });
   events.push({ t: Date.now(), type: "ask", task: TASKS[$("task").value].id, level,
     expect: $("expect").value.trim(), got: $("got").value.trim(), guess, question: $("q").value.trim() });
-  // 无法读取 AI Studio 的回复，所以问过当前级别后就解锁下一级
-  if (level === maxUnlocked && maxUnlocked < 3) { maxUnlocked++; renderLadder(); }
+  setBusy(true);
+  window.postMessage({ source: "tutor-page", type: "ASK", requestId, text }, window.location.origin);
+});
+
+// ---- 没装插件时的兜底：复制粘贴 ----
+$("copy").addEventListener("click", async () => {
+  await copyText(buildPrompt());
+  addMsg("system", "Copied. Paste it into the AI 100 Tutor agent in AI Studio.");
 });
 
 // ---- 自由提问区 ----
@@ -383,12 +422,26 @@ What I think so far: ${think || "(I didn't write anything yet)"}`;
 
 $("qa-ask").addEventListener("click", async () => {
   const q = $("qa-q").value.trim();
-  if (!q) { $("qa-q").focus(); toast("Type your question first."); return; }
-  await copyText(buildQaPrompt());
-  toast(PASTE_TIP);
-  openAiStudio();
-  events.push({ t: Date.now(), type: "qa_ask", kind: qaKind, question: q,
-    think: $("qa-think").value.trim(), hasCode: !!$("qa-code").value.trim() });
+  if (!q) { $("qa-q").focus(); addMsg("system", "Type your question first.", "qa-log"); return; }
+  if (!hasBridge()) {
+    await copyText(buildQaPrompt());
+    addMsg("system", "Tutor extension not found. Your question was copied: paste it into the AI 100 Tutor agent in AI Studio.", "qa-log");
+    return;
+  }
+  const text = buildQaPrompt();
+  const requestId = newId();
+  const think = $("qa-think").value.trim();
+  addMsg("student", q + ($("qa-code").value.trim() ? "\n(+ code attached)" : "") + (think ? `\nI think: ${think}` : ""), "qa-log");
+  pending.set(requestId, { log: "qa-log", kind: qaKind, bubble: addMsg("system", "Waiting for the tutor…", "qa-log") });
+  events.push({ t: Date.now(), type: "qa_ask", kind: qaKind, question: q, think, hasCode: !!$("qa-code").value.trim() });
+  setBusy(true);
+  window.postMessage({ source: "tutor-page", type: "ASK", requestId, text }, window.location.origin);
+  ["qa-q", "qa-think"].forEach((id) => ($(id).value = ""));
+});
+
+$("qa-clear").addEventListener("click", () => {
+  $("qa-log").innerHTML = '<p class="empty">Your questions and the tutor\'s answers show up here.</p>';
+  ["qa-q", "qa-code", "qa-think"].forEach((id) => ($(id).value = ""));
 });
 
 // ---- 难度报告 ----
